@@ -1,10 +1,6 @@
 Candles
 
-One room. Five candles.
-
-# Hollow Hall
-
-It only moves when your light is off it. Light every candle before it reaches you.
+Torch
 
 Move
 
@@ -14,8 +10,8 @@ Aim light
 
 Mouse · right thumb
 
-Light a candle
+Torch
 
-Walk over it
+F, Space or right-click · torch button
 
-Best in a dark room with sound on.
+## Elias's pages
