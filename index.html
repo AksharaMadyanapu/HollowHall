@@ -122,6 +122,15 @@ h1 { margin: 0 0 16px; font-family: var(--display); font-weight: 400; font-size:
 #jpanel li { margin: 0 0 12px; font-size: 15px; line-height: 1.5; color: #cfc8b4; }
 #jpanel li.miss { color: #6c675b; font-style: italic; }
 @media (prefers-reduced-motion: reduce) { h1 { animation: none; } .wicks i.lit::after { animation: none; } .panel.fade { animation: none; } .meter.low b span { animation: none; } }
+#ledger { position: absolute; inset: 0; z-index: 6; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,.72); padding: 12px; cursor: default; }
+.paper { background: #d9d2b8; color: #2a2118; padding: 16px 18px; max-width: 620px; width: 100%; max-height: 100%; overflow-y: auto; box-shadow: 0 8px 40px #000; box-sizing: border-box; }
+.paper h2 { margin: 0 0 6px; font-family: var(--display); font-weight: 400; font-size: 28px; }
+.paper p { margin: 0 0 8px; font-size: 14px; line-height: 1.45; }
+.paper #l-note { font-size: 12px; color: #5a5040; font-style: italic; }
+.paper canvas { width: 100%; height: auto; display: block; border: 1px solid #8b8470; margin: 10px 0; }
+.paper .hbtn { color: #2a2118; border-color: #2a2118; background: transparent; }
+.how { margin: 16px 0 0; padding-left: 20px; font-size: 14px; line-height: 1.5; color: #c4bdaa; max-width: 54ch; }
+.how li { margin-bottom: 5px; }
 @media (max-width: 520px) { .hl small { display: none; } .meter b { width: 64px; } }
 </style>
 
@@ -137,7 +146,7 @@ h1 { margin: 0 0 16px; font-family: var(--display); font-weight: 400; font-size:
       <div class="meter" id="meter" role="img" aria-label="Torch battery"><small>Torch</small><b><span id="batfill"></span></b></div>
     </div>
     <div class="hr">
-      <button class="hbtn" id="clue" type="button">Ledger</button>
+      <button class="hbtn" id="clue" type="button">Ledger (L)</button>
       <button class="hbtn" id="torch" type="button" aria-pressed="true">Torch on</button>
       <button class="hbtn" id="mute" type="button">Sound on</button>
     </div>
@@ -145,16 +154,20 @@ h1 { margin: 0 0 16px; font-family: var(--display); font-weight: 400; font-size:
 
   <div id="sub" aria-live="polite"><span id="subtext"></span></div>
 
+  <div id="ledger" hidden><div class="paper"><h2 id="l-title"></h2><p id="l-rule"></p><canvas id="lmap" width="560" height="380"></canvas><p id="l-order"></p><p id="l-note"></p><button class="hbtn" id="lclose" type="button">Close (L)</button></div></div>
+
   <section id="screen" aria-live="polite">
     <div class="panel" id="panel">
       <p class="tag" id="s-tag"></p>
       <h1 id="s-title"></h1>
       <p id="s-text"></p>
+      <ol class="how" id="s-how"><li>Your torch holds the ghost still. The moment your light leaves it, it moves. Keep it in your beam.</li><li>Each room hides Elias’s ledger page. It has a red wax seal and glows red. Find it first.</li><li>Press L or tap Ledger to open it. It shows a map of the room with every candle numbered in the order to light it.</li><li>Stand beside a candle until its ring fills. Wrong order and every flame goes out.</li><li>Batteries refill your torch. Light every candle to open the door.</li></ol>
       <div class="chapters" id="chapters"></div>
       <dl class="keys" id="s-keys">
         <div><dt>Move</dt><dd>WASD or arrow keys · left thumb</dd></div>
         <div><dt>Aim light</dt><dd>Mouse · right thumb</dd></div>
         <div><dt>Torch</dt><dd>F, Space or right-click · torch button</dd></div>
+        <div><dt>Ledger</dt><dd>L · Ledger button</dd></div>
       </dl>
       <div class="btns"><button id="go" type="button"></button><button id="go2" type="button"></button></div>
       <p class="note" id="s-note"></p>
@@ -253,6 +266,7 @@ let level = 0, cfg = LEVELS[0];
 let rects = [], candles = [], bats = [], items = [], foes = [], motes = [], door = { x: 0, y: 0, w: 0, h: 0, cx: 0, cy: 0 }, WALL = 14;
 let t = 0, lightI = .95, flick = { cut: 0, next: 4 }, shake = 0, flash = 0, deadT = 0, rt = 0, dawn = 0;
 let elapsed = 0, litN = 0, danger = 0, hb = 1, endShown = false, grainT = 0, subT = 0;
+let ledgerOpen = false;
 let order = [], orderTxt = '', clueKnown = false, fails = 0;
 let torch = true, bat = 100, doorOpen = false, beam = true, screenKind = 'title', prevKind = 'title', lastClear = null;
 const CONE = .36;
@@ -549,6 +563,36 @@ function lightCandle(c) {
     best.y = Math.max(0, Math.min(H, P.y + (best.y - P.y) / dd * nd));
   }
 }
+function openLedger() {
+  if (state !== 'play' || ledgerOpen) return;
+  ledgerOpen = true; hideSub(); $('#ledger').hidden = false;
+  $('#l-title').textContent = 'Wren’s ledger: ' + cfg.name;
+  $('#l-rule').textContent = cfg.rule;
+  $('#l-order').textContent = 'Each dot is a candle, numbered in the order to light it. Grid squares in order: ' + orderTxt + '. Red dots are already lit.';
+  $('#l-note').textContent = NOTES[cfg.clue];
+  const cw = 560, ch = Math.round(cw * H / W), cvs = $('#lmap'), g = cvs.getContext('2d');
+  cvs.width = cw; cvs.height = ch;
+  const sx = cw / W, sy = ch / H;
+  g.fillStyle = '#cbc3a7'; g.fillRect(0, 0, cw, ch);
+  g.strokeStyle = '#5a4a30'; g.lineWidth = 3; g.strokeRect(2, 2, cw - 4, ch - 4);
+  g.font = '11px Special Elite, monospace'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  rects.forEach(f => { g.fillStyle = 'rgba(70,55,35,.28)'; g.fillRect(f.x * sx, f.y * sy, f.w * sx, f.h * sy); g.fillStyle = 'rgba(42,33,24,.6)'; g.fillText(f.k, (f.x + f.w / 2) * sx, (f.y + f.h / 2) * sy); });
+  const dw = Math.max(8, door.w * sx), dh = Math.max(8, door.h * sy);
+  g.fillStyle = '#5a1414'; g.fillRect(door.cx * sx - dw / 2, door.cy * sy - dh / 2, dw, dh);
+  let tx = door.cx * sx, ty = door.cy * sy;
+  if (door.w > door.h) ty += 16; else tx += Math.sign(W / 2 - door.cx) * 24;
+  g.fillStyle = '#5a1414'; g.fillText('DOOR', tx, ty);
+  g.fillStyle = '#2a5a7a'; g.beginPath(); g.arc(P.x * sx, P.y * sy, 6, 0, TAU); g.fill();
+  g.fillStyle = '#2a5a7a'; g.fillText('you', P.x * sx, P.y * sy - 13);
+  candles.forEach((c, i) => {
+    const n = order.indexOf(i) + 1, x = c.x * sx, y = c.y * sy;
+    g.beginPath(); g.arc(x, y, 14, 0, TAU); g.fillStyle = c.lit ? '#a11d1d' : '#f4efe0'; g.fill();
+    g.lineWidth = 2; g.strokeStyle = '#2a2118'; g.stroke();
+    g.font = 'bold 16px Special Elite, monospace'; g.fillStyle = c.lit ? '#f4efe0' : '#2a2118'; g.fillText(String(n), x, y + 1);
+  });
+  $('#lclose').focus({ preventScroll: true });
+}
+function closeLedger() { ledgerOpen = false; $('#ledger').hidden = true; }
 function tryCandle(i) {
   const c = candles[i];
   if (!clueKnown) { click(); if (subT <= 0) showSub('The wick will not catch. Somewhere in this room Elias wrote down how it was done.', 5); return; }
@@ -561,7 +605,7 @@ function tryCandle(i) {
 function foundNote(n) {
   n.got = true; paper(); if (n.id === cfg.clue) clueKnown = true;
   if (!save.notes.includes(n.id)) { save.notes.push(n.id); persist(); }
-  showSub(n.id === cfg.clue ? 'LEDGER FOUND. ' + NOTES[n.id] + ' LIGHT IN THIS ORDER: ' + orderTxt : NOTES[n.id], 8 + NOTES[n.id].length / 12);
+  if (n.id === cfg.clue) openLedger(); else showSub(NOTES[n.id], 6 + NOTES[n.id].length / 14);
 }
 function completeLevel() {
   const prev = level, tm = elapsed;
@@ -601,7 +645,7 @@ function showScreen(kind) {
   if (kind !== 'title') panel.classList.add('fade');
   const go = $('#go'), go2 = $('#go2');
   const set = (tag, title, text, note) => { $('#s-tag').textContent = tag; $('#s-title').textContent = title; $('#s-text').textContent = text; $('#s-note').textContent = note || ''; };
-  $('#chapters').hidden = kind !== 'title'; $('#s-keys').hidden = kind !== 'title';
+  $('#chapters').hidden = kind !== 'title'; $('#s-keys').hidden = kind !== 'title'; $('#s-how').hidden = !(kind === 'title' || kind === 'chapter');
   go2.hidden = false; go2.disabled = false;
   const n = save.notes.length;
   if (kind === 'title') {
@@ -839,7 +883,7 @@ function render() {
   ctx.fillStyle = 'rgba(220,213,194,.28)';
   motes.forEach(m => { ctx.beginPath(); ctx.arc(m.x, m.y, m.s, 0, TAU); ctx.fill(); });
   drawDoor();
-  candles.forEach(drawCandleBase);
+  candles.forEach((c, ci) => { drawCandleBase(c); if (clueKnown && !c.lit) { ctx.fillStyle = 'rgba(255,215,160,.95)'; ctx.font = (13 * S) + 'px Special Elite, monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(String(order.indexOf(ci) + 1), c.x, c.y - 17 * S); } });
   bats.forEach(b => { if (!b.got) drawBattery(b); });
   items.forEach(n => { if (!n.got) drawNote(n); });
   const cr = CR(), cA = 1 - Math.min(1, dawn * 1.6);
@@ -926,6 +970,8 @@ function renderDead() {
 /* ---------- input ---------- */
 addEventListener('keydown', e => {
   keys[e.code] = true;
+  if (state === 'play' && e.code === 'KeyL' && !e.repeat) { if (ledgerOpen) closeLedger(); else if (clueKnown) openLedger(); }
+  if (ledgerOpen && e.code === 'Escape') closeLedger();
   if (state === 'play' && (e.code === 'KeyF' || e.code === 'Space')) { if (!e.repeat) toggleTorch(); e.preventDefault(); }
   else if (state === 'play' && /^Arrow/.test(e.code)) e.preventDefault();
 });
@@ -949,11 +995,12 @@ stage.addEventListener('pointermove', e => {
 const up = e => { if (stick && e.pointerId === stick.id) stick = null; if (e.pointerId === aimId) aimId = null; };
 stage.addEventListener('pointerup', up); stage.addEventListener('pointercancel', up);
 stage.addEventListener('contextmenu', e => { e.preventDefault(); toggleTorch(); });
-[hud, screen].forEach(el => el.addEventListener('pointerdown', e => e.stopPropagation()));
+[hud, screen, $('#ledger')].forEach(el => el.addEventListener('pointerdown', e => e.stopPropagation()));
 $('#go').addEventListener('click', onGo);
 $('#go2').addEventListener('click', onGo2);
 $('#back').addEventListener('click', () => { panel.hidden = false; jpanel.hidden = true; screenKind = prevKind; $('#go').focus({ preventScroll: true }); });
-$('#clue').addEventListener('click', e => { if (state === 'play') showSub(clueKnown ? 'Ledger: ' + cfg.rule + ' LIGHT IN THIS ORDER: ' + orderTxt : 'You have not found the ledger page yet. It has a red wax seal and glows red. Search the room.', 7); e.currentTarget.blur(); });
+$('#clue').addEventListener('click', e => { if (state === 'play') { if (ledgerOpen) closeLedger(); else if (clueKnown) openLedger(); else showSub('You have not found the ledger page yet. It has a red wax seal and glows red. Search the room.', 7); } e.currentTarget.blur(); });
+$('#lclose').addEventListener('click', closeLedger);
 $('#torch').addEventListener('click', e => { toggleTorch(); e.currentTarget.blur(); });
 $('#mute').addEventListener('click', e => {
   muted = !muted; e.currentTarget.textContent = muted ? 'Sound off' : 'Sound on'; e.currentTarget.blur();
@@ -981,7 +1028,7 @@ resize(); setLevel(0); showScreen('title'); noise();
 let last = performance.now();
 function frame(now) {
   const dt = Math.min(.05, (now - last) / 1000); last = now;
-  update(dt); render();
+  if (!ledgerOpen) update(dt); render();
   grainT += dt; if (grainT > .09) { grainT = 0; if (!reduce) noise(); }
   requestAnimationFrame(frame);
 }
