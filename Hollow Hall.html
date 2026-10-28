@@ -137,6 +137,7 @@ h1 { margin: 0 0 16px; font-family: var(--display); font-weight: 400; font-size:
       <div class="meter" id="meter" role="img" aria-label="Torch battery"><small>Torch</small><b><span id="batfill"></span></b></div>
     </div>
     <div class="hr">
+      <button class="hbtn" id="clue" type="button">Ledger</button>
       <button class="hbtn" id="torch" type="button" aria-pressed="true">Torch on</button>
       <button class="hbtn" id="mute" type="button">Sound on</button>
     </div>
@@ -182,24 +183,25 @@ const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const NOTES = [
   'Elias, day 1. The agent would not come past the gate. He said the hall keeps what it is given. I laughed. I should not have.',
   'Day 3. It only moves when I stop looking. I ringed the bedroom with candles and it stopped at the edge. Light holds it.',
-  'Day 4. My torch dies faster here than it should. The hall feeds on the dark, and on batteries, and on me.',
+  'Day 4. My torch dies faster here than it should. The hall feeds on the dark, and on batteries, and on me. Wren kept a ledger: She was walked in from the door one step at a time. Nearest the door first, farthest last. Out of order, every flame dies.',
   'Day 6. The ledger says a man named Wren sealed his wife in the cellar and lit candles to keep her quiet. The candles failed. She did not.',
-  'Day 7. She is not hunting me. She is looking for him. She checks every face she finds, then moves on. I think I look like him.',
+  'Day 7. She is not hunting me. She is looking for him. She checks every face she finds, then moves on. I think I look like him. Ledger: Wren read to her every night, a page at a time. Light them as a page is read: top first, bottom last.',
   'Day 8. The cellar stairs open only for someone carrying fire. I am going down. Nira, if you read this, do not carry me out.',
   'Day 9. I found her. She is not angry. She is tired. The candles were never meant to keep her out. They keep her in.',
-  'Day 10. Light does not hurt her. It holds her still, and being held is what is killing her. Put the flames out and she can rest.',
+  'Day 10. Light does not hurt her. It holds her still, and being held is what is killing her. Put the flames out and she can rest. Ledger: The clock turns one way. Begin at the top and follow the hands.',
   'Day 10, night. If you do it, put them out one at a time, and do not look away. Do not look away, Nira. E.'
 ];
 const LEVELS = [
   { name: 'The Hall', roman: 'I', theme: 'wood',
     rects: [['sofa', .10, .17, .21, .10], ['shelf', .56, .03, .30, .07], ['table', .38, .40, .14, .16], ['wardrobe', .82, .45, .08, .22], ['bed', .08, .62, .18, .20], ['piano', .58, .72, .20, .12]],
-    candles: [[.12, .50], [.33, .90], [.92, .14], [.50, .64], [.92, .90]],
+    candles: [[.06, .52], [.36, .92], [.92, .14], [.50, .60], [.92, .94]],
     cells: [[.45, .30], [.20, .40], [.70, .35], [.68, .62], [.70, .93]],
     notes: [[0, .62, .20], [1, .07, .40], [2, .45, .95]],
     door: { side: 'right', f: .30 }, start: [.30, .45],
     foes: [{ x: .88, y: .80, delay: 0, spd: 1 }],
     attract: { p: [.62, .58], f: [.34, .40] },
-    open: 'The front door locked behind you. Elias left pages in the dark. Find them.',
+    clue: 2, key: (x, y) => Math.hypot(1 - x, .3 - y), rule: 'Nearest the door first, farthest last. Out of order, every flame dies.', hint: 'Start with the candle closest to the door, then work outward.',
+    open: 'The front door locked behind you. Elias left pages in the dark. Find the page that glows red. It says how the candles must be lit.',
     intro: '' },
   { name: 'The Library', roman: 'II', theme: 'library',
     rects: [['shelf', .06, .03, .26, .07], ['shelf', .40, .03, .26, .07], ['shelf', .70, .03, .24, .07], ['shelf', .02, .22, .06, .30], ['shelf', .92, .30, .06, .30],
@@ -208,21 +210,23 @@ const LEVELS = [
     cells: [[.30, .20], [.75, .20], [.25, .78], [.80, .42], [.40, .58]],
     notes: [[3, .20, .15], [4, .66, .68], [5, .08, .90]],
     door: { side: 'left', f: .80 }, start: [.88, .20],
-    foes: [{ x: .10, y: .90, delay: 0, spd: 1.03 }, { x: .90, y: .92, delay: 28, spd: 1 }],
+    foes: [{ x: .10, y: .90, delay: 0, spd: 1.03 }],
     attract: { p: [.60, .30], f: [.22, .50] },
-    open: 'A reading room. The candles are in the stacks, and so is the way down.',
-    intro: 'The door opens onto a long reading room. Books lie open everywhere, as if someone read in a hurry. It will not stay alone for long.' },
+    clue: 4, key: (x, y) => y, rule: 'Light them as a page is read: top first, bottom last.', hint: 'Start with the highest candle on the screen and move down.',
+    open: 'A reading room. The candles are in the stacks, and so is the way down. Look for the red glow.',
+    intro: 'The door opens onto a long reading room. Books lie open everywhere, as if someone read in a hurry.' },
   { name: 'The Cellar', roman: 'III', theme: 'stone',
     rects: [['pillar', .22, .18, .06, .10], ['pillar', .72, .18, .06, .10], ['pillar', .22, .66, .06, .10], ['pillar', .72, .66, .06, .10], ['altar', .43, .40, .14, .16],
       ['crate', .06, .12, .09, .12], ['crate', .84, .80, .10, .12], ['crate', .40, .84, .10, .09], ['crate', .86, .14, .07, .10], ['crate', .06, .78, .08, .10]],
-    candles: [[.50, .30], [.36, .48], [.64, .48], [.50, .68]],
+    candles: [[.50, .30], [.36, .48], [.64, .48], [.50, .70]],
     cells: [[.12, .50], [.88, .50], [.30, .12], [.70, .12], [.30, .90], [.72, .90]],
     notes: [[6, .08, .35], [7, .92, .62], [8, .62, .84]],
     door: { side: 'top', f: .50 }, start: [.22, .88],
-    foes: [{ x: .85, y: .30, delay: 0, spd: 1.05 }, { x: .15, y: .30, delay: 12, spd: 1 }],
+    foes: [{ x: .85, y: .30, delay: 0, spd: 1.05 }],
     attract: { p: [.65, .52], f: [.30, .30] },
-    open: 'Four candles, one altar. Do not look away.',
-    intro: 'The stairs go down further than the house is tall. Four candles stand around a stone altar. Two of them are down here with you.' }
+    clue: 7, key: (x, y) => (Math.atan2(y - .48, x - .5) + Math.PI / 2 + TAU) % TAU, rule: 'Begin at the top and follow the hands of a clock around the altar.', hint: 'Start with the candle above the altar, then go clockwise.',
+    open: 'Four candles, one altar. Do not look away. Look for the red glow.',
+    intro: 'The stairs go down further than the house is tall. Four candles stand around a stone altar. Something old is down here with you.' }
 ];
 
 /* ---------- saved progress (per browser, optional) ---------- */
@@ -249,6 +253,7 @@ let level = 0, cfg = LEVELS[0];
 let rects = [], candles = [], bats = [], items = [], foes = [], motes = [], door = { x: 0, y: 0, w: 0, h: 0, cx: 0, cy: 0 }, WALL = 14;
 let t = 0, lightI = .95, flick = { cut: 0, next: 4 }, shake = 0, flash = 0, deadT = 0, rt = 0, dawn = 0;
 let elapsed = 0, litN = 0, danger = 0, hb = 1, endShown = false, grainT = 0, subT = 0;
+let order = [], orderTxt = '', clueKnown = false, fails = 0;
 let torch = true, bat = 100, doorOpen = false, beam = true, screenKind = 'title', prevKind = 'title', lastClear = null;
 const CONE = .36;
 const baseRange = () => 400 * S;
@@ -264,7 +269,7 @@ function layout() {
   WALL = 14 * S;
   const wc = candles.map(c => c.lit), wb = bats.map(b => b.got), wn = items.map(n => n.got);
   rects = cfg.rects.map(([k, a, b, c, d]) => ({ k, x: W * a, y: H * b, w: W * c, h: H * d }));
-  candles = cfg.candles.map(([a, b], i) => ({ x: W * a, y: H * b, lit: !!wc[i], ph: i * 1.7 }));
+  candles = cfg.candles.map(([a, b], i) => ({ x: W * a, y: H * b, lit: !!wc[i], ph: i * 1.7, prog: 0 }));
   bats = cfg.cells.map(([a, b], i) => ({ x: W * a, y: H * b, got: !!wb[i], ph: i * 2.1 }));
   items = cfg.notes.map(([id, a, b], i) => ({ id, x: W * a, y: H * b, got: !!wn[i], ph: i * 1.3 }));
   const L = 74 * S, d = cfg.door;
@@ -332,6 +337,12 @@ function buildFloor() {
   fx.fillStyle = '#090807';
   fx.fillRect(0, 0, W, WALL); fx.fillRect(0, H - WALL, W, WALL); fx.fillRect(0, 0, WALL, H); fx.fillRect(W - WALL, 0, WALL, H);
   fx.strokeStyle = '#2b241d'; fx.lineWidth = 2; fx.strokeRect(WALL, WALL, W - 2 * WALL, H - 2 * WALL);
+  fx.strokeStyle = 'rgba(220,213,194,.07)'; fx.lineWidth = 1;
+  for (let i = 1; i < 9; i++) { fx.beginPath(); fx.moveTo(W * i / 9, WALL); fx.lineTo(W * i / 9, H - WALL); fx.stroke(); }
+  for (let j = 1; j < 6; j++) { fx.beginPath(); fx.moveTo(WALL, H * j / 6); fx.lineTo(W - WALL, H * j / 6); fx.stroke(); }
+  fx.fillStyle = 'rgba(220,213,194,.8)'; fx.font = Math.max(9, 11 * S) + 'px "Special Elite", monospace'; fx.textAlign = 'center'; fx.textBaseline = 'middle';
+  for (let i = 0; i < 9; i++) { const l = String.fromCharCode(65 + i); fx.fillText(l, W * (i + .5) / 9, WALL / 2); fx.fillText(l, W * (i + .5) / 9, H - WALL / 2); }
+  for (let j = 0; j < 6; j++) { fx.fillText(String(j + 1), WALL / 2, H * (j + .5) / 6); fx.fillText(String(j + 1), W - WALL / 2, H * (j + .5) / 6); }
 }
 
 function furniture(f) {
@@ -497,14 +508,18 @@ function setLevel(i) {
   foes = cfg.foes.map(f => ({ x: W * f.x, y: H * f.y, tw: 0, lit: false, move: false, delay: f.delay, spd: f.spd, active: false }));
   layout();
   torch = true; bat = 100; litN = 0; doorOpen = false; dawn = 0;
+  order = cfg.candles.map((c, i) => i).sort((a, b) => cfg.key(...cfg.candles[a]) - cfg.key(...cfg.candles[b]));
+  orderTxt = order.map(i => cellName(...cfg.candles[i])).join(' → ');
   placeTitle(); buildWicks(); updateHud(); updateTorchUi();
 }
+function cellName(x, y) { return String.fromCharCode(65 + Math.min(8, Math.floor(x * 9))) + (Math.min(5, Math.floor(y * 6)) + 1); }
 function reset() {
   P.x = W * cfg.start[0]; P.y = H * cfg.start[1]; P.a = 0;
   foes.forEach((f, i) => { const s = cfg.foes[i]; f.x = W * s.x; f.y = H * s.y; f.tw = 0; f.lit = false; f.move = false; f.active = s.delay === 0; });
   candles.forEach(c => c.lit = false); bats.forEach(b => b.got = false); items.forEach(n => n.got = false);
   litN = 0; doorOpen = false; elapsed = 0; danger = 0; hb = 1; shake = 0; flash = 0; deadT = 0; rt = 0; dawn = 0; endShown = false;
   bat = 100; torch = true; flick.cut = 0; flick.next = 4; stick = null; aimId = null;
+  clueKnown = save.notes.includes(cfg.clue); fails = 0; candles.forEach(c => c.prog = 0);
   buildWicks(); updateHud(); updateTorchUi();
 }
 function startLevelPlay() {
@@ -534,10 +549,19 @@ function lightCandle(c) {
     best.y = Math.max(0, Math.min(H, P.y + (best.y - P.y) / dd * nd));
   }
 }
+function tryCandle(i) {
+  const c = candles[i];
+  if (!clueKnown) { click(); if (subT <= 0) showSub('The wick will not catch. Somewhere in this room Elias wrote down how it was done.', 5); return; }
+  if (i === order[litN]) { lightCandle(c); return; }
+  fails++; candles.forEach(x => x.lit = false); litN = 0; updateHud(); stinger(); flash = .6; shake = .8; flick.cut = .6;
+  const g = foes.find(f => f.active);
+  if (g) { const a = Math.atan2(g.y - P.y, g.x - P.x), d = Math.hypot(g.x - P.x, g.y - P.y), nd = Math.min(d, 200 * S); g.x = P.x + Math.cos(a) * nd; g.y = P.y + Math.sin(a) * nd; }
+  showSub('Wrong flame. Every candle goes out. ' + (fails >= 2 ? cfg.hint : 'Read the ledger again.'), 6);
+}
 function foundNote(n) {
-  n.got = true; paper();
+  n.got = true; paper(); if (n.id === cfg.clue) clueKnown = true;
   if (!save.notes.includes(n.id)) { save.notes.push(n.id); persist(); }
-  showSub(NOTES[n.id], 11);
+  showSub(n.id === cfg.clue ? 'LEDGER FOUND. ' + NOTES[n.id] + ' LIGHT IN THIS ORDER: ' + orderTxt : NOTES[n.id], 8 + NOTES[n.id].length / 12);
 }
 function completeLevel() {
   const prev = level, tm = elapsed;
@@ -582,12 +606,12 @@ function showScreen(kind) {
   const n = save.notes.length;
   if (kind === 'title') {
     set('Nine days missing', 'Hollow Hall',
-      'Your brother Elias went into Hollow Hall nine days ago. His last message said do not follow me. You followed. It only moves when your light is off it. Light the candles, open the door, find what he left behind.',
+      'Your brother Elias went into Hollow Hall nine days ago. His last message said do not follow me. You followed. It only moves when your light is off it. Search each room for his ledger, work out the order the candles must be lit in, then open the door.',
       `Pages found ${n} of ${NOTES.length} · Endings seen ${save.endings.length} of 2 · Best in a dark room with sound on.`);
     renderChapters();
     go.textContent = save.reached > 0 ? 'Continue' : 'Enter the hall'; go2.textContent = `Journal (${n}/${NOTES.length})`;
   } else if (kind === 'dead') {
-    set('You stopped looking', 'It found you', `${litN} of ${candles.length} candles lit. You lasted ${fmt(elapsed)}.`, 'Pages you found stay in your journal. It gets faster with every flame.');
+    set('You stopped looking', 'It found you', `${litN} of ${candles.length} candles lit. You lasted ${fmt(elapsed)}.`, 'Pages you found stay in your journal. It gets faster with every flame. A wrong flame puts them all out.');
     go.textContent = 'Try again'; go2.textContent = 'Title';
   } else if (kind === 'chapter') {
     set('Chapter ' + LEVELS[level].roman, LEVELS[level].name, LEVELS[level].intro,
@@ -707,7 +731,7 @@ function update(dt) {
     }
     danger += (Math.max(0, 1 - minD / (330 * S)) - danger) * Math.min(1, dt * 3);
     if (danger > .7) shake = Math.max(shake, (danger - .7) * 1.4);
-    for (const c of candles) if (!c.lit && Math.hypot(P.x - c.x, P.y - c.y) < 22 * S) { lightCandle(c); }
+    candles.forEach((c, i) => { if (c.lit) return; const near = Math.hypot(P.x - c.x, P.y - c.y) < 30 * S; c.prog = Math.max(0, c.prog + (near ? dt / .8 : -dt * 2)); if (c.prog >= 1) { c.prog = 0; tryCandle(i); } });
     for (const b of bats) if (!b.got && Math.hypot(P.x - b.x, P.y - b.y) < 20 * S) {
       b.got = true; bat = Math.min(100, bat + 35); pickup();
       if (!torch && bat > 0) { torch = true; updateTorchUi(); }
@@ -771,6 +795,7 @@ function cone(half, R, alpha) {
 }
 function drawCandleBase(c) {
   const r = 5 * S;
+  if (c.prog > 0) { ctx.strokeStyle = 'rgba(255,170,80,.95)'; ctx.lineWidth = 2.5 * S; ctx.beginPath(); ctx.arc(c.x, c.y, r + 9 * S, -Math.PI / 2, -Math.PI / 2 + TAU * c.prog); ctx.stroke(); }
   ctx.strokeStyle = '#5a4a30'; ctx.lineWidth = 2 * S; ctx.beginPath(); ctx.arc(c.x, c.y, r + 4 * S, 0, TAU); ctx.stroke();
   ctx.fillStyle = '#d8d0bd'; ctx.beginPath(); ctx.arc(c.x, c.y, r, 0, TAU); ctx.fill();
   ctx.beginPath(); ctx.arc(c.x + r * .9, c.y + r * .7, r * .45, 0, TAU); ctx.fill();
@@ -784,10 +809,11 @@ function drawBattery(b) {
   ctx.fillStyle = 'rgba(255,255,255,.18)'; ctx.fillRect(b.x - w / 2, b.y - h / 2, w, h * .25);
 }
 function drawNote(n) {
-  ctx.save(); ctx.translate(n.x, n.y); ctx.rotate(n.id * .5 - .8);
+  ctx.save(); ctx.translate(n.x, n.y); ctx.rotate(n.id * .5 - .8); if (n.id === cfg.clue) ctx.scale(1.6, 1.6);
   ctx.fillStyle = '#d9d2b8'; ctx.fillRect(-6 * S, -8 * S, 12 * S, 16 * S);
   ctx.strokeStyle = '#8b8470'; ctx.lineWidth = 1;
   for (let i = -4; i <= 4; i += 3) line(-4 * S, i * S, 4 * S, i * S);
+  if (n.id === cfg.clue) { ctx.fillStyle = '#a11d1d'; ctx.beginPath(); ctx.arc(0, 5 * S, 2.6 * S, 0, TAU); ctx.fill(); }
   ctx.restore();
 }
 function drawDoor() {
@@ -840,7 +866,7 @@ function render() {
     if (c.lit) cut(c.x, c.y, 165 * S, .95 * f); else cut(c.x, c.y, 42 * S, .55);
   });
   bats.forEach(b => { if (!b.got) cut(b.x, b.y, 34 * S, .4); });
-  items.forEach(n => { if (!n.got) cut(n.x, n.y, 34 * S, .4); });
+  items.forEach(n => { if (!n.got) { if (n.id === cfg.clue) cut(n.x, n.y, 90 * S, .6); else cut(n.x, n.y, 34 * S, .4); } });
   if (doorOpen) cut(door.cx, door.cy, 130 * S, .8); else cut(door.cx, door.cy, 55 * S, .28);
   ctx.drawImage(dk, 0, 0, W, H);
 
@@ -864,7 +890,7 @@ function render() {
     }
   });
   bats.forEach(b => { if (!b.got) glow(b.x, b.y, 24 * S, '120,200,255', .12 + .1 * (.5 + .5 * Math.sin(t * 3 + b.ph))); });
-  items.forEach(n => { if (!n.got) glow(n.x, n.y, 24 * S, '255,240,200', .12 + .1 * (.5 + .5 * Math.sin(t * 2.4 + n.ph))); });
+  items.forEach(n => { if (!n.got) glow(n.x, n.y, (n.id === cfg.clue ? 70 : 24) * S, n.id === cfg.clue ? '255,70,50' : '255,240,200', (n.id === cfg.clue ? .3 : .12) + .1 * (.5 + .5 * Math.sin(t * 2.4 + n.ph))); });
   if (doorOpen) glow(door.cx, door.cy, 120 * S, '255,170,80', .3 * (.9 + .1 * Math.sin(t * 6)));
   // eyes in the dark
   if (cA > 0) foes.forEach(f => {
@@ -927,6 +953,7 @@ stage.addEventListener('contextmenu', e => { e.preventDefault(); toggleTorch(); 
 $('#go').addEventListener('click', onGo);
 $('#go2').addEventListener('click', onGo2);
 $('#back').addEventListener('click', () => { panel.hidden = false; jpanel.hidden = true; screenKind = prevKind; $('#go').focus({ preventScroll: true }); });
+$('#clue').addEventListener('click', e => { if (state === 'play') showSub(clueKnown ? 'Ledger: ' + cfg.rule + ' LIGHT IN THIS ORDER: ' + orderTxt : 'You have not found the ledger page yet. It has a red wax seal and glows red. Search the room.', 7); e.currentTarget.blur(); });
 $('#torch').addEventListener('click', e => { toggleTorch(); e.currentTarget.blur(); });
 $('#mute').addEventListener('click', e => {
   muted = !muted; e.currentTarget.textContent = muted ? 'Sound off' : 'Sound on'; e.currentTarget.blur();
